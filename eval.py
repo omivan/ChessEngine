@@ -7,11 +7,10 @@ def get_eval(board):
         color = 1 if board.turn == chess.WHITE else -1
         if board.is_checkmate():
             return -color * 10000
-        elif board.is_stalemate():
-            return 0
-        elif board.is_insufficient_material():
-            return 0
-        else:
+        elif (board.is_stalemate()
+              or board.is_seventyfive_moves() or
+              board.is_fivefold_repetition() or
+              board.is_insufficient_material()):
             return 0
 
     piece_values = {
