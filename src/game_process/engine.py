@@ -1,5 +1,5 @@
 import chess
-from eval import get_eval
+from src.game_process.eval import get_eval
 import random
 
 
