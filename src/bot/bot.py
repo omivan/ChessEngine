@@ -19,6 +19,7 @@ import time
 import chess.svg
 import chess.pgn
 
+from src.bot.bot_phrases import get_phrase_for
 from src.game_process.engine import ChessEngine
 
 # Bot token can be obtained via https://t.me/BotFather
@@ -30,6 +31,7 @@ chess_game = None
 generator = None
 bot_color = 1  # 1 - White, 2 - Black
 engine = ChessEngine()
+bot_level = 4
 
 
 class GameStates(StatesGroup):
@@ -122,9 +124,10 @@ async def send_style_example(message: types.Message, style_sample):
 
 
 async def bot_make_move(message: types.Message, board: chess.Board):
-    best_move1, best_eval1 = engine.get_best_move(board, depth=4)
+    best_move1, best_eval1 = engine.get_best_move(board, depth=bot_level)
     board.push(best_move1)
-    await message.answer('Я походив, чекай позицію')
+    await message.answer(get_phrase_for('move'))
+    # await message.answer('Я походив, чекай позицію')
 
 
 @dp.message(aiogram.filters.Command('get_position'))
@@ -209,6 +212,28 @@ async def get_move(message: types.Message, state: FSMContext):
     await send_current_position(message)
 
 
+async def check_end_game(message: types.Message, state: FSMContext, chess_game: chess.Board):
+    if chess_game.is_game_over():
+        result = result_of_game(chess_game)
+        print(result)
+        if result == -1:
+            if bot_color == 1:
+                await message.answer(get_phrase_for('win'))
+            else:
+                await message.answer(get_phrase_for('lose'))
+            await message.answer('Чорні виграли!')
+        elif result == 0:
+            await message.answer(get_phrase_for('draw'))
+            await message.answer('Нічия')
+        elif result == 1:
+            if bot_color == 2:
+                await message.answer(get_phrase_for('win'))
+            else:
+                await message.answer(get_phrase_for('lose'))
+            await message.answer('Білі виграли!')
+        await state.set_state()
+
+
 @dp.message(GameStates.in_bot_game)
 async def get_move(message: types.Message, state: FSMContext):
     global chess_game
@@ -219,36 +244,22 @@ async def get_move(message: types.Message, state: FSMContext):
             chess_game.push(chess.Move.from_uci(move_text))
         else:
             await message.answer('Хід є неможливим, спробуйте інший')
+            await message.answer(get_phrase_for('invalid_move'))
             return
     except chess.InvalidMoveError as e:
         await message.answer('Хід написано неправильно, спробуйте ще раз\nформат: {Назва (однією літерою)}{Звідки}{'
                              'Куди}')
+        await message.answer(get_phrase_for('invalid_move'))
     except ValueError as e:
         await message.answer(e.message)
 
     await send_current_position(message)
-    if chess_game.is_game_over():
-        result = result_of_game(chess_game)
-        print(result)
-        if result == -1:
-            await message.answer('Чорні виграли!')
-        elif result == 0:
-            await message.answer('Нічия')
-        elif result == 1:
-            await message.answer('Білі виграли!')
-        await state.set_state()
+    await check_end_game(message, state, chess_game)
 
     await bot_make_move(message, chess_game)
     await send_current_position(message)
-    if chess_game.is_game_over():
-        result = result_of_game(chess_game)
-        if result == -1:
-            await message.answer('Чорні виграли!')
-        elif result == 0:
-            await message.answer('Нічия')
-        elif result == 1:
-            await message.answer('Білі виграли!')
-        await state.set_state()
+    await check_end_game(message, state, chess_game)
+
 
 @dp.message(aiogram.filters.Command('set_board_style'))
 async def get_board_styles(message: types.Message, state: FSMContext):
